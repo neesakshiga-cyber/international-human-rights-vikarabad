@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloudfirestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net - Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Primitives ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    // Retrieve existing resource data
+    function existing() {
+      return resource.data;
+    }
+
+    // Path Variable Hardening (ID Poisoning Guard)
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admin authorization based on trusted emails (including Srikanth Kavali and AI Studio preview active user neesakshiga@gmail.com)
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email_verified == true && (
+        request.auth.token.email == 'neesakshiga@gmail.com' ||
+        request.auth.token.email == 'srikanthkavali@gmail.com' ||
+        request.auth.token.email == 'srikanth.kavali@gmail.com' ||
+        request.auth.token.email == 'admin@humanrights-vikarabad.org'
+      );
+    }
+
+    // --- Entity Validation Helpers ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['userId', 'email', 'displayName', 'lastSeen']) &&
+             data.keys().size() >= 4 &&
+             data.keys().size() <= 6 &&
+             data.userId == request.auth.uid &&
+             data.email is string && data.email.size() <= 200 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+             data.lastSeen is timestamp &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000)) &&
+             (!('status' in data) || (data.status is string && (data.status == 'online' || data.status == 'away' || data.status == 'offline')));
+    }
+
+    function isValidComplaint(data) {
+      return data.keys().hasAll(['complaintId', 'userId', 'userName', 'userEmail', 'title', 'category', 'description', 'status', 'createdAt', 'updatedAt']) &&
+             data.keys().size() >= 10 &&
+             data.keys().size() <= 11 &&
+             data.complaintId is string && data.complaintId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.userName is string && data.userName.size() <= 100 &&
+             data.userEmail is string && data.userEmail.size() <= 200 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 150 &&
+             data.category is string && data.category.size() <= 100 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 10000 &&
+             data.status is string && (data.status == 'submitted' || data.status == 'under_review' || data.status == 'resolved') &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             (!('adminRemarks' in data) || (data.adminRemarks is string && data.adminRemarks.size() <= 5000));
+    }
+
+    function isValidMembership(data) {
+      return data.keys().hasAll(['membershipId', 'userId', 'fullName', 'phone', 'address', 'category', 'status', 'createdAt']) &&
+             data.keys().size() == 8 &&
+             data.membershipId is string && data.membershipId.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 100 &&
+             data.phone is string && data.phone.size() >= 1 && data.phone.size() <= 20 &&
+             data.address is string && data.address.size() >= 1 && data.address.size() <= 1000 &&
+             data.category is string && (data.category == 'Standard Member' || data.category == 'Executive Volunteer' || data.category == 'Student Advocate') &&
+             data.status is string && (data.status == 'pending' || data.status == 'approved' || data.status == 'rejected') &&
+             data.createdAt is timestamp;
+    }
+
+    // --- Collection Routes ---
+
+    // USERS COLLECTION
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) && incoming().lastSeen == request.time;
+      allow update: if isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming()) && incoming().lastSeen == request.time && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'status'])
+      );
+    }
+
+    // COMPLAINTS COLLECTION
+    match /complaints/{complaintId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && isValidId(complaintId) && incoming().complaintId == complaintId && isValidComplaint(incoming()) && incoming().userId == request.auth.uid && incoming().status == 'submitted' && incoming().createdAt == request.time && incoming().updatedAt == request.time && !('adminRemarks' in incoming());
+      allow update: if isVerifiedUser() && isValidId(complaintId) && incoming().complaintId == complaintId && isValidComplaint(incoming()) && incoming().updatedAt == request.time && (
+        isAdmin() ||
+        (existing().userId == request.auth.uid && 
+         incoming().status == existing().status &&
+         (!('adminRemarks' in existing()) && !('adminRemarks' in incoming()) || incoming().adminRemarks == existing().adminRemarks) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'description', 'updatedAt'])
+        )
+      );
+      allow delete: if isVerifiedUser() && isValidId(complaintId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+
+    // MEMBERSHIPS COLLECTION
+    match /memberships/{membershipId} {
+      allow read: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      allow create: if isVerifiedUser() && isValidId(membershipId) && incoming().membershipId == membershipId && isValidMembership(incoming()) && incoming().userId == request.auth.uid && incoming().status == 'pending' && incoming().createdAt == request.time;
+      allow update: if isVerifiedUser() && isValidId(membershipId) && incoming().membershipId == membershipId && isValidMembership(incoming()) && (
+        isAdmin() ||
+        (existing().userId == request.auth.uid && 
+         incoming().status == existing().status && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'phone', 'address', 'category'])
+        )
+      );
+      allow delete: if isVerifiedUser() && isValidId(membershipId) && (existing().userId == request.auth.uid || isAdmin());
+    }
+  }
+}

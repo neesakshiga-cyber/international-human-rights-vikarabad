@@ -1,0 +1,162 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with display details and activity status",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The unique Firebase Auth UID of the user"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User email address"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the user"
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Avatar photo URL"
+        },
+        "lastSeen": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp of the last active presence"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["online", "away", "offline"],
+          "description": "Current status of the user"
+        }
+      },
+      "required": ["userId", "email", "displayName", "lastSeen"]
+    },
+    "Complaint": {
+      "title": "Complaint",
+      "description": "A human rights complaint filed by a citizen",
+      "type": "object",
+      "properties": {
+        "complaintId": {
+          "type": "string",
+          "description": "Unique identifier for the complaint"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner/creator"
+        },
+        "userName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Name of the filer"
+        },
+        "userEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Email of the filer"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 150,
+          "description": "Title of the human rights grievance"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Type of human rights protection category"
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "Full description of the incident"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["submitted", "under_review", "resolved"],
+          "description": "Review status of the complaint"
+        },
+        "adminRemarks": {
+          "type": "string",
+          "maxLength": 5000,
+          "description": "Official comments/remarks by Srikanth Kavali or other administrator"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the complaint was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the complaint was last updated"
+        }
+      },
+      "required": ["complaintId", "userId", "userName", "userEmail", "title", "category", "description", "status", "createdAt", "updatedAt"]
+    },
+    "Membership": {
+      "title": "Membership",
+      "description": "Become a Member/Volunteer application form",
+      "type": "object",
+      "properties": {
+        "membershipId": {
+          "type": "string",
+          "description": "Unique identifier for the membership"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the member"
+        },
+        "fullName": {
+          "type": "string",
+          "maxLength": 100,
+          "description": "Full legal name of the applicant"
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 20,
+          "description": "Contact number"
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Postal/Office address of the applicant"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Standard Member", "Executive Volunteer", "Student Advocate"],
+          "description": "Membership classification"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "rejected"],
+          "description": "Approval status of the application"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when applicant submitted form"
+        }
+      },
+      "required": ["membershipId", "userId", "fullName", "phone", "address", "category", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles collections indexed by UID"
+    },
+    "complaints/{complaintId}": {
+      "schema": { "$ref": "#/entities/Complaint" },
+      "description": "Citizen human rights complaints tracker"
+    },
+    "memberships/{membershipId}": {
+      "schema": { "$ref": "#/entities/Membership" },
+      "description": "Applications to become an official member/volunteer of the Vikarabad chapter"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "International Human Rights - Vikarabad",
+  "description": "Official multilingual government-style portal for International Human Rights – Vikarabad, Telangana. File complaints, track cases, register as a member, and explore human rights education.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
